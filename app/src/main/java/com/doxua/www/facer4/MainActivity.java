@@ -1,15 +1,22 @@
 package com.doxua.www.facer4;
 
 import android.Manifest;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.NotificationCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -50,6 +57,17 @@ import static org.bytedeco.javacpp.opencv_core.Rect;
 
 
 public class MainActivity extends AppCompatActivity {
+
+    //For Photos
+    public static int NOTIFICATION_ID = 0;
+    Bitmap bitmapSelectGallery = null;
+    Bitmap bitmapAutoGallery;
+    static Bitmap finalBitmapPic;
+    GalleryObserver directoryFileObserver;
+    private static MainActivity instance;
+
+    //For Photos ^
+
     public static final String TAG = "RegFaces";
     public static final String EIGEN_FACES_CLASSIFIER = "eigenFacesClassifier.yml";
     private static final int ACCEPT_LEVEL = 1000;
@@ -74,6 +92,16 @@ public class MainActivity extends AppCompatActivity {
     // External storage.
     public static final String EXTERNAL_TRAIN_FOLDER = "saved_images";
 
+    String personName;
+    int acceptanceLevel;
+    int prediction;
+    int personId;
+    String matchText;
+    String info;
+    String nothing = " ";
+    String moreInfo;
+    int defaultValue = 0;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -82,7 +110,7 @@ public class MainActivity extends AppCompatActivity {
         // Create the image view and text view.
         imageView = (ImageView) findViewById(R.id.imageView);
         tv = (TextView) findViewById(R.id.predict_faces);
-        result_information = findViewById(R.id.result);
+        result_information = (TextView) findViewById(R.id.result);
 
         int cameraPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
         int storagePermission = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
@@ -101,10 +129,17 @@ public class MainActivity extends AppCompatActivity {
                 openGallery();
             }
         });
+
+        instance = this;
+
+        directoryFileObserver = new GalleryObserver("/storage/emulated/0/MyGlass/");
+        directoryFileObserver.startWatching();
+
+//            lastPhotoInGallery();
     }
 
     private void requirePermissions() {
-        ActivityCompat.requestPermissions(this, new String[] {
+        ActivityCompat.requestPermissions(this, new String[]{
                 Manifest.permission.CAMERA,
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
         }, 11);
@@ -146,20 +181,112 @@ public class MainActivity extends AppCompatActivity {
             Uri imageUri = data.getData();
 
             // Convert to Bitmap.
-            Bitmap bitmap = null;
             try {
-                bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), imageUri);
+                bitmapSelectGallery = MediaStore.Images.Media.getBitmap(this.getContentResolver(), imageUri);
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            detectDisplayAndRecognize(bitmap);
+            imageView.setImageBitmap(bitmapSelectGallery);
+
+            if (bitmapSelectGallery != null) {
+                detectDisplayAndRecognize(bitmapSelectGallery);
+            }
         }
+    }
+
+    public static MainActivity getInstance() {
+        return instance;
+    }
+
+    public void lastPhotoInGallery() {
+        // Find the last picture
+
+        String[] projection = new String[]{
+                MediaStore.Images.ImageColumns._ID,
+                MediaStore.Images.ImageColumns.DATA,
+                MediaStore.Images.ImageColumns.BUCKET_DISPLAY_NAME,
+                MediaStore.Images.ImageColumns.DATE_TAKEN,
+                MediaStore.Images.ImageColumns.MIME_TYPE
+        };
+        final Cursor cursor = getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null,
+                null, MediaStore.Images.ImageColumns.DATE_TAKEN + " DESC");
+
+        // Put it in the image view
+
+
+        if (cursor.moveToFirst()) {
+            final ImageView imageView = (ImageView) findViewById(R.id.imageView);
+            String imageLocation = cursor.getString(1);
+            File imageFile = new File(imageLocation);
+
+            if (imageFile.exists()) {
+                bitmapAutoGallery = BitmapFactory.decodeFile(imageLocation);
+
+                if (bitmapAutoGallery != null) {
+                    imageView.setImageBitmap(bitmapAutoGallery);
+
+                    detectDisplayAndRecognize(bitmapAutoGallery);
+
+                }
+            }
+        }
+
+    }
+
+
+    public void notifications() {
+        //This code is required to send notifications to the phone and Google Glass
+        //Google Glass automatically will display phone notifications as part of its design
+
+        //Need to increase notification id by 1 in order to have multiple notifications displayed, otherwise notifications
+        //will overwrite previous notification
+        NOTIFICATION_ID++;
+
+
+        //This is used to open the new screen when the notification is clicked on the phone:
+
+        Intent detailsIntent = new Intent(MainActivity.this, MainActivity.class);
+        Log.d("PLAYGROUND", "Details ID: " + getIntent().getIntExtra("EXTRA_DETAILS_ID", defaultValue));
+
+        detailsIntent.putExtra("EXTRA_DETAILS_ID", NOTIFICATION_ID);
+        PendingIntent detailsPendingIntent = PendingIntent.getActivity(MainActivity.this, NOTIFICATION_ID, detailsIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+
+
+        //To determine what needs to be displayed
+        if (bitmapSelectGallery != null) {
+
+            //bitmapSelectGallery is for images selected from Gallery on phone
+            //Need to resize bitmaps otherwise app will crash and/or not display photo correctly
+            finalBitmapPic = Bitmap.createScaledBitmap(bitmapSelectGallery, 500, 800, false);
+        } else {
+            //bitmapAutoGallery is for the image that auto loads on app since it is latest image in Gallery
+            //Need to resize bitmaps otherwise app will crash and/or not display photo correctly
+            finalBitmapPic = Bitmap.createScaledBitmap(bitmapAutoGallery, 500, 800, false);
+        }
+
+        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(MainActivity.this)
+
+                //LargeIcon needs to be updated to pull from app
+                //setContentTitle needs to be updated to info about match
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setLargeIcon(finalBitmapPic)
+                .setContentTitle(matchText)
+                .setAutoCancel(true)
+                .setContentIntent(detailsPendingIntent)
+                .setContentText(moreInfo)
+                .setAutoCancel(true)
+                .addAction(android.R.drawable.ic_menu_compass, "Details", detailsPendingIntent);
+
+        NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        notificationManager.notify(NOTIFICATION_ID, mBuilder.build());
+
     }
 
     /**
      * Face Detection.
      * Face Recognition.
      * Display the detection result and recognition result.
+     *
      * @param bitmap
      */
     void detectDisplayAndRecognize(Bitmap bitmap) {
@@ -198,7 +325,7 @@ public class MainActivity extends AppCompatActivity {
         // -----------------------------------------------------------------------------------------
         //                                       DISPLAY
         // -----------------------------------------------------------------------------------------
-        if ( numFaces > 0 ) {
+        if (numFaces > 0) {
             // Multiple face detection.
             for (int i = 0; i < numFaces; i++) {
 
@@ -227,8 +354,9 @@ public class MainActivity extends AppCompatActivity {
         // -----------------------------------------------------------------------------------------
         //                                  FACE RECOGNITION
         // -----------------------------------------------------------------------------------------
-        recognizeMultiple(this, faces.get(0), greyMat, tv);
-    }
+            recognizeMultiple(this, faces.get(0), greyMat, tv);
+
+        }
 
 
 
@@ -247,12 +375,13 @@ public class MainActivity extends AppCompatActivity {
      * prediction = 0 Angelina Jolie
      * prediction = 1 Tom Cruise
      * IMPORTANT!
+     *
      * @param dadosFace
      * @param greyMat
      */
     void recognizeMultiple(Context context, Rect dadosFace, Mat greyMat, TextView tv) {
-        int personId = 0;
-        String personName = "";
+        personId = 0;
+        personName = "";
 
         // Load the correct model for our face recognition.
         File f = loadTrainedModel(this, R.raw.eigenfacesclassifier);
@@ -268,8 +397,8 @@ public class MainActivity extends AppCompatActivity {
         faceRecognizer.predict(detectedFace, label, reliability);
 
         // Display on the text view what we found.
-        int prediction = label.get(0);
-        int acceptanceLevel = (int) reliability.get(0);
+        prediction = label.get(0);
+        acceptanceLevel = (int) reliability.get(0);
 
         if (prediction == 0) {
             personName = "Angelina Jolie";
@@ -281,46 +410,63 @@ public class MainActivity extends AppCompatActivity {
             personId = 2;
         }
 
+        displayMatchInfo();
+    }
+
+    public void displayMatchInfo() {
+
         // -----------------------------------------------------------------------------------------
         //                         DISPLAY THE FACE RECOGNITION PREDICTION
         // -----------------------------------------------------------------------------------------
-        if ((prediction != 0 && prediction != 1) || acceptanceLevel > MIDDLE_ACCEPT_LEVEL)
-        {
+        if ((prediction != 0 && prediction != 1) || acceptanceLevel > MIDDLE_ACCEPT_LEVEL) {
             // Display on text view, not matching or unknown person.
-            tv.setText("Unknown");
-            result_information.setText("");
-        }
-        else if (acceptanceLevel >= ACCEPT_LEVEL && acceptanceLevel <= MIDDLE_ACCEPT_LEVEL)
-        {
+            tv.setText("Unknown. No Face Found");
+            matchText = tv.getText().toString();
+
+            result_information.setText(nothing);
+            moreInfo = result_information.getText().toString();
+
+        } else if (acceptanceLevel >= ACCEPT_LEVEL && acceptanceLevel <= MIDDLE_ACCEPT_LEVEL) {
             tv.setText(
-                    "Found a match but not sure." +
-                            "\nWarning! Acceptable Level is high!" +
-                            "\nHi, " + personName +  " " + acceptanceLevel +
-                            "\nPerson ID: " + personId +
-                            "\nPrediction Id: " + prediction
+                    "Potential Match." +
+                            "\nWarning! Acceptance Level high!" +
+                            "\nPotential Match: " + personName +
+                            "\n Acceptance Level: " + acceptanceLevel
+
             );
-            result_information.setText("");
-        }
-        else
-        {
+            matchText = tv.getText().toString();
+
+            result_information.setText(nothing);
+            moreInfo = result_information.getText().toString();
+
+        } else {
             // Display the information for the matching image.
             tv.setText(
-                    "A match is found." +
-                            "\nHi, " + personName +  " " + acceptanceLevel +
-                            "\nPerson ID: " + personId +
-                            "\nPrediction Id: " + prediction
+                    "Match found:" + personName +
+                            "\n Acceptance Level: " + acceptanceLevel
+
             );
+            matchText = tv.getText().toString();
 
             if (personId >= 1) {
                 DatabaseAccess databaseAccess = DatabaseAccess.getInstance(getApplicationContext());
                 databaseAccess.open();
 
-                String info = databaseAccess.getInformation(personId);
+                info = databaseAccess.getInformation(personId);
                 result_information.setText(info);
+                moreInfo = result_information.getText().toString();
 
                 databaseAccess.close();
             }
-        }
+        } // End of prediction.
+
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                notifications();
+            }
+        }, 2000);
+
     }
 
     /***********************************************************************************************
