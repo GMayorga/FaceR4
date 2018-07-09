@@ -245,11 +245,11 @@ public class MainActivity extends AppCompatActivity {
 
         //This is used to open the new screen when the notification is clicked on the phone:
 
-        Intent detailsIntent = new Intent(MainActivity.this, MainActivity.class);
+        Intent detailsIntent = new Intent(MainActivity.this, DetailsActivity.class);
         Log.d("PLAYGROUND", "Details ID: " + getIntent().getIntExtra("EXTRA_DETAILS_ID", defaultValue));
 
         detailsIntent.putExtra("EXTRA_DETAILS_ID", NOTIFICATION_ID);
-        PendingIntent detailsPendingIntent = PendingIntent.getActivity(MainActivity.this, NOTIFICATION_ID, detailsIntent, PendingIntent.FLAG_CANCEL_CURRENT);
+        PendingIntent detailsPendingIntent = PendingIntent.getActivity(MainActivity.this, NOTIFICATION_ID, detailsIntent, PendingIntent.FLAG_ONE_SHOT);
 
 
         //To determine what needs to be displayed

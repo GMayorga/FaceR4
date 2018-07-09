@@ -39,8 +39,6 @@ public class DetailsActivity extends AppCompatActivity {
 
     public void pullFromMain(){
 
-         counter=MainActivity.NOTIFICATION_ID;
-            imageView.setImageBitmap(MainActivity.finalBitmapPic);
 
 
     }
