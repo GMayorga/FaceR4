@@ -72,8 +72,8 @@ public class MainActivity extends AppCompatActivity {
 
     public static final String TAG = "RegFaces";
     public static final String EIGEN_FACES_CLASSIFIER = "eigenFacesClassifier.yml";
-    private static final int ACCEPT_LEVEL = 1500;
-    private static final int MIDDLE_ACCEPT_LEVEL = 2500;
+    private static final int ACCEPT_LEVEL = 1000;
+    private static final int MIDDLE_ACCEPT_LEVEL = 2000;
     private static final int PICK_IMAGE = 100;
     private static final int IMG_SIZE = 160;
 
