@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
@@ -26,6 +27,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.bytedeco.javacpp.DoublePointer;
 import org.bytedeco.javacpp.IntPointer;
@@ -100,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
     String info;
     String nothing = " ";
     String moreInfo;
-    int defaultValue = 0;
+    AlertDialog.Builder builder;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -135,8 +137,11 @@ public class MainActivity extends AppCompatActivity {
         directoryFileObserver = new GalleryObserver("/storage/emulated/0/MyGlass/");
         directoryFileObserver.startWatching();
 
-//            lastPhotoInGallery();
+            lastPhotoInGallery();
+
+
     }
+
 
     private void requirePermissions() {
         ActivityCompat.requestPermissions(this, new String[]{
@@ -144,6 +149,29 @@ public class MainActivity extends AppCompatActivity {
                 Manifest.permission.WRITE_EXTERNAL_STORAGE
         }, 11);
     }
+
+    public void alertMessage(){
+
+        builder = new AlertDialog.Builder(this);
+
+         builder.setMessage(moreInfo)
+                        .setCancelable(false)
+
+                        .setNegativeButton("Click to dismiss", new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int id) {
+                                //  Action for Button
+                                dialog.cancel();
+                            }
+                        });
+                //Creating dialog box
+                AlertDialog alert = builder.create();
+
+                alert.setTitle(matchText);
+                alert.show();
+
+        };
+
+
 
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         Map<String, Integer> perm = new HashMap<>();
@@ -245,10 +273,7 @@ public class MainActivity extends AppCompatActivity {
 
         //This is used to open the new screen when the notification is clicked on the phone:
 
-        Intent detailsIntent = new Intent(MainActivity.this, DetailsActivity.class);
-        Log.d("PLAYGROUND", "Details ID: " + getIntent().getIntExtra("EXTRA_DETAILS_ID", defaultValue));
-
-        detailsIntent.putExtra("EXTRA_DETAILS_ID", NOTIFICATION_ID);
+        Intent detailsIntent = new Intent(MainActivity.this, MainActivity.class);
         PendingIntent detailsPendingIntent = PendingIntent.getActivity(MainActivity.this, NOTIFICATION_ID, detailsIntent, PendingIntent.FLAG_ONE_SHOT);
 
 
@@ -266,16 +291,15 @@ public class MainActivity extends AppCompatActivity {
 
         NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(MainActivity.this)
 
-                //LargeIcon needs to be updated to pull from app
-                //setContentTitle needs to be updated to info about match
+
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setLargeIcon(finalBitmapPic)
-                .setContentTitle(matchText)
                 .setAutoCancel(true)
                 .setContentIntent(detailsPendingIntent)
-                .setContentText(moreInfo)
+                .setContentText(matchText + "\n \n" + moreInfo)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(matchText + "\n"+ moreInfo))
                 .setAutoCancel(true)
-                .addAction(android.R.drawable.ic_menu_compass, "Details", detailsPendingIntent);
+                .addAction(android.R.drawable.ic_menu_compass, "Press to Clear and return to Main", detailsPendingIntent);
 
         NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         notificationManager.notify(NOTIFICATION_ID, mBuilder.build());
@@ -420,7 +444,7 @@ public class MainActivity extends AppCompatActivity {
         // -----------------------------------------------------------------------------------------
         if ((prediction != 0 && prediction != 1) || acceptanceLevel > MIDDLE_ACCEPT_LEVEL) {
             // Display on text view, not matching or unknown person.
-            tv.setText("Unknown. No Face Found");
+            tv.setText("Unknown");
             matchText = tv.getText().toString();
 
             result_information.setText(nothing);
@@ -428,10 +452,9 @@ public class MainActivity extends AppCompatActivity {
 
         } else if (acceptanceLevel >= ACCEPT_LEVEL && acceptanceLevel <= MIDDLE_ACCEPT_LEVEL) {
             tv.setText(
-                    "Potential Match." +
+                    "Potential Match: " + personName +
                             "\nWarning! Acceptance Level high!" +
-                            "\nPotential Match: " + personName +
-                            "\n Acceptance Level: " + acceptanceLevel
+                            "\nAcceptance Level: " + acceptanceLevel
 
             );
             matchText = tv.getText().toString();
@@ -442,8 +465,8 @@ public class MainActivity extends AppCompatActivity {
         } else {
             // Display the information for the matching image.
             tv.setText(
-                    "Match found:" + personName +
-                            "\n Acceptance Level: " + acceptanceLevel
+                    "Match found: " + personName +
+                            "\nAcceptance Level: " + acceptanceLevel
 
             );
             matchText = tv.getText().toString();
@@ -457,6 +480,8 @@ public class MainActivity extends AppCompatActivity {
                 moreInfo = result_information.getText().toString();
 
                 databaseAccess.close();
+                alertMessage();
+
             }
         } // End of prediction.
 
