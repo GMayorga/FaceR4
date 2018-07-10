@@ -72,8 +72,8 @@ public class MainActivity extends AppCompatActivity {
 
     public static final String TAG = "RegFaces";
     public static final String EIGEN_FACES_CLASSIFIER = "eigenFacesClassifier.yml";
-    private static final int ACCEPT_LEVEL = 1000;
-    private static final int MIDDLE_ACCEPT_LEVEL = 2000;
+    private static final int ACCEPT_LEVEL = 1500;
+    private static final int MIDDLE_ACCEPT_LEVEL = 2500;
     private static final int PICK_IMAGE = 100;
     private static final int IMG_SIZE = 160;
 
@@ -274,7 +274,7 @@ public class MainActivity extends AppCompatActivity {
         //This is used to open the new screen when the notification is clicked on the phone:
 
         Intent detailsIntent = new Intent(MainActivity.this, MainActivity.class);
-        PendingIntent detailsPendingIntent = PendingIntent.getActivity(MainActivity.this, NOTIFICATION_ID, detailsIntent, PendingIntent.FLAG_ONE_SHOT);
+        PendingIntent detailsPendingIntent = PendingIntent.getActivity(MainActivity.this, NOTIFICATION_ID, detailsIntent, PendingIntent.FLAG_UPDATE_CURRENT);
 
 
         //To determine what needs to be displayed
@@ -378,9 +378,17 @@ public class MainActivity extends AppCompatActivity {
         // -----------------------------------------------------------------------------------------
         //                                  FACE RECOGNITION
         // -----------------------------------------------------------------------------------------
+        if (numFaces == 0) {
+
+            tv.setText("No Faces Detected");
+
+        }else{
+
             recognizeMultiple(this, faces.get(0), greyMat, tv);
 
         }
+
+    }
 
 
 
@@ -444,7 +452,9 @@ public class MainActivity extends AppCompatActivity {
         // -----------------------------------------------------------------------------------------
         if ((prediction != 0 && prediction != 1) || acceptanceLevel > MIDDLE_ACCEPT_LEVEL) {
             // Display on text view, not matching or unknown person.
-            tv.setText("Unknown");
+            tv.setText("Unknown" +
+                        "\nAcceptance Level: " + acceptanceLevel
+            );
             matchText = tv.getText().toString();
 
             result_information.setText(nothing);
