@@ -11,7 +11,6 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
@@ -22,12 +21,12 @@ import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import org.bytedeco.javacpp.DoublePointer;
 import org.bytedeco.javacpp.IntPointer;
@@ -65,7 +64,9 @@ public class MainActivity extends AppCompatActivity {
     Bitmap bitmapSelectGallery = null;
     Bitmap bitmapAutoGallery;
     static Bitmap finalBitmapPic;
-    GalleryObserver directoryFileObserver;
+    GalleryObserver glassDirectoryFileObserver;
+    Bitmap bitmapNoFace;
+
     private static MainActivity instance;
 
     //For Photos ^
@@ -103,6 +104,7 @@ public class MainActivity extends AppCompatActivity {
     String nothing = " ";
     String moreInfo;
     AlertDialog.Builder builder;
+    AlertDialog alert;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,7 +114,10 @@ public class MainActivity extends AppCompatActivity {
         // Create the image view and text view.
         imageView = (ImageView) findViewById(R.id.imageView);
         tv = (TextView) findViewById(R.id.predict_faces);
+        tv.setMovementMethod(new ScrollingMovementMethod());
+
         result_information = (TextView) findViewById(R.id.result);
+        result_information.setMovementMethod(new ScrollingMovementMethod());
 
         int cameraPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
         int storagePermission = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
@@ -134,10 +139,11 @@ public class MainActivity extends AppCompatActivity {
 
         instance = this;
 
-        directoryFileObserver = new GalleryObserver("/storage/emulated/0/MyGlass/");
-        directoryFileObserver.startWatching();
+        glassDirectoryFileObserver = new GalleryObserver("/storage/emulated/0/MyGlass/");
+        glassDirectoryFileObserver.startWatching();
 
-            lastPhotoInGallery();
+
+        lastPhotoInGallery();
 
 
     }
@@ -150,27 +156,40 @@ public class MainActivity extends AppCompatActivity {
         }, 11);
     }
 
-    public void alertMessage(){
+    public void alertMessage(int option) {
 
-        builder = new AlertDialog.Builder(this);
+        if (option == 0) {
 
-         builder.setMessage(moreInfo)
-                        .setCancelable(false)
 
-                        .setNegativeButton("Click to dismiss", new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int id) {
-                                //  Action for Button
-                                dialog.cancel();
-                            }
-                        });
-                //Creating dialog box
-                AlertDialog alert = builder.create();
+            builder = new AlertDialog.Builder(this);
 
-                alert.setTitle(matchText);
-                alert.show();
+            builder.setCancelable(false)
 
-        };
+                    .setNegativeButton("Click to dismiss", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int id) {
+                            //  Action for Button
+                            dialog.cancel();
+                        }
+                    });
+            //Creating dialog box
+             alert = builder.create();
+             alert.setMessage(moreInfo);
+             alert.setTitle(matchText);
+             alert.show();
 
+        }
+        ;
+
+        if (option == 1) {
+
+            if (alert.isShowing()) {
+
+                alert.dismiss();
+
+
+            }
+        }
+    }
 
 
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -251,9 +270,17 @@ public class MainActivity extends AppCompatActivity {
                 bitmapAutoGallery = BitmapFactory.decodeFile(imageLocation);
 
                 if (bitmapAutoGallery != null) {
-                    imageView.setImageBitmap(bitmapAutoGallery);
+                    runOnUiThread(new Runnable() {
 
-                    detectDisplayAndRecognize(bitmapAutoGallery);
+                        @Override
+                        public void run() {
+
+                            imageView.setImageBitmap(bitmapAutoGallery);
+
+                            detectDisplayAndRecognize(bitmapAutoGallery);
+                        }
+                    });
+
 
                 }
             }
@@ -283,11 +310,19 @@ public class MainActivity extends AppCompatActivity {
             //bitmapSelectGallery is for images selected from Gallery on phone
             //Need to resize bitmaps otherwise app will crash and/or not display photo correctly
             finalBitmapPic = Bitmap.createScaledBitmap(bitmapSelectGallery, 500, 800, false);
-        } else {
+
+        } else if(bitmapAutoGallery != null) {
             //bitmapAutoGallery is for the image that auto loads on app since it is latest image in Gallery
             //Need to resize bitmaps otherwise app will crash and/or not display photo correctly
             finalBitmapPic = Bitmap.createScaledBitmap(bitmapAutoGallery, 500, 800, false);
         }
+        else{
+
+            finalBitmapPic = Bitmap.createScaledBitmap(bitmapNoFace, 500, 800, false);
+
+
+        }
+
 
         NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(MainActivity.this)
 
@@ -303,6 +338,8 @@ public class MainActivity extends AppCompatActivity {
 
         NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         notificationManager.notify(NOTIFICATION_ID, mBuilder.build());
+
+        bitmapSelectGallery =null;
 
     }
 
@@ -381,6 +418,12 @@ public class MainActivity extends AppCompatActivity {
         if (numFaces == 0) {
 
             tv.setText("No Faces Detected");
+            bitmapNoFace = bitmapAutoGallery;
+
+            matchText = tv.getText().toString();
+
+            result_information.setText(nothing);
+            moreInfo = result_information.getText().toString();
 
         }else{
 
@@ -490,7 +533,7 @@ public class MainActivity extends AppCompatActivity {
                 moreInfo = result_information.getText().toString();
 
                 databaseAccess.close();
-                alertMessage();
+                alertMessage(0);
 
             }
         } // End of prediction.
